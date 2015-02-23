@@ -3,7 +3,9 @@ package main
 import (
 	"encoding/json"
 	"io/ioutil"
+	"math/rand"
 	"net/http"
+	"time"
 
 	"code.google.com/p/goprotobuf/proto"
 	log "github.com/Sirupsen/logrus"
@@ -16,10 +18,35 @@ func sendEvent(encoder *json.Encoder, eventType mesosproto.Event_Type, event *me
 	return encoder.Encode(event)
 }
 
+func sendOffers(encoder *json.Encoder, frameworkInfo *mesosproto.FrameworkInfo) {
+	for {
+		time.Sleep(time.Duration(rand.Intn(10)) * time.Second)
+		slaveId, _ := generateID()
+		offerId, _ := generateID()
+		hostname := "slave.host" + slaveId
+		offer := mesosproto.Offer{
+			Id:          &mesosproto.OfferID{Value: &offerId},
+			FrameworkId: frameworkInfo.Id,
+			SlaveId:     &mesosproto.SlaveID{Value: &slaveId},
+			Hostname:    &hostname,
+			Resources:   resources(),
+		}
+		event_type := mesosproto.Event_OFFERS
+
+		event := &mesosproto.Event{
+			Type: &event_type,
+			Offers: &mesosproto.Event_Offers{
+				Offers: []*mesosproto.Offer{&offer},
+			},
+		}
+		frameworksChans.send(frameworkInfo.Id.GetValue(), event)
+	}
+}
+
 func events(res http.ResponseWriter, req *http.Request) {
-	registerMessage := mesosproto.RegisterFrameworkMessage{}
+	frameworkInfo := mesosproto.FrameworkInfo{}
 	if req.Header.Get("Content-Type") == "application/json" {
-		if err := json.NewDecoder(req.Body).Decode(&registerMessage); err != nil {
+		if err := json.NewDecoder(req.Body).Decode(&frameworkInfo); err != nil {
 			http.Error(res, err.Error(), 501)
 			return
 		}
@@ -29,7 +56,7 @@ func events(res http.ResponseWriter, req *http.Request) {
 			http.Error(res, err.Error(), 502)
 			return
 		}
-		if err := proto.Unmarshal(buf, &registerMessage); err != nil {
+		if err := proto.Unmarshal(buf, &frameworkInfo); err != nil {
 			http.Error(res, err.Error(), 503)
 			return
 		}
@@ -41,18 +68,18 @@ func events(res http.ResponseWriter, req *http.Request) {
 		ID    string
 	)
 
-	if registerMessage.GetFramework() != nil && registerMessage.GetFramework().GetId() != nil {
-		ID = registerMessage.Framework.Id.GetValue()
+	if frameworkInfo.GetId() != nil {
+		ID = frameworkInfo.Id.GetValue()
 		//Check that this framework hasn't registerd yet
 		if !frameworksChans.hasID(ID) {
-			http.Error(res, "Unknown framework", 406)
+			http.Error(res, "Unknown framework", 403)
 			return
 		}
 		mchan = frameworksChans.create(ID, req.RemoteAddr)
 		// Reregistering framework
 		err := sendEvent(encoder, mesosproto.Event_REREGISTERED, &mesosproto.Event{
 			Reregistered: &mesosproto.Event_Reregistered{
-				FrameworkId: registerMessage.Framework.Id,
+				FrameworkId: frameworkInfo.Id,
 			},
 		})
 		if err != nil {
@@ -68,11 +95,12 @@ func events(res http.ResponseWriter, req *http.Request) {
 			return
 		}
 		mchan = frameworksChans.create(ID, req.RemoteAddr)
+		frameworkInfo.Id = &mesosproto.FrameworkID{
+			Value: &ID,
+		}
 		err = sendEvent(encoder, mesosproto.Event_REGISTERED, &mesosproto.Event{
 			Registered: &mesosproto.Event_Registered{
-				FrameworkId: &mesosproto.FrameworkID{
-					Value: &ID,
-				},
+				FrameworkId: frameworkInfo.Id,
 			},
 		})
 		if err != nil {
@@ -80,7 +108,7 @@ func events(res http.ResponseWriter, req *http.Request) {
 			return
 		}
 	}
-
+	go sendOffers(encoder, &frameworkInfo)
 	for {
 		mess := <-mchan
 		if err := sendEvent(encoder, *mess.Type, mess); err != nil {

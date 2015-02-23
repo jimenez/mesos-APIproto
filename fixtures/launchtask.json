@@ -1,1 +1,1 @@
-{"framework_info":{"id":{"value":""}}, "type":7, "launch":{"task_infos":[{"task_id":{"value":"FOOBAR"}}]}}
+{"framework_info":{"id":{"value":""}}, "type":12, "accept":{"offer_ids":[], "operations": [{"type":1, "launch": {"task_infos": [{"name": "FOOBAR", "task_id": {"value": "BARFOO"}}]}}]}}

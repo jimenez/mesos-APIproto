@@ -1,13 +1,12 @@
 package main
 
 import (
-	"encoding/hex"
 	"fmt"
 	"log"
+	"math/rand"
 	"net/http"
 	"sync"
-
-	"crypto/rand"
+	"time"
 
 	"github.com/VoltFramework/volt/mesosproto"
 	"github.com/gorilla/mux"
@@ -66,18 +65,12 @@ func (fc *FrameworksChans) send(ID string, event *mesosproto.Event) {
 
 var frameworksChans = newFrameworksChans()
 
-func generateID() (string, error) {
-	id := make([]byte, 6)
-	n, err := rand.Read(id)
-	if n != len(id) || err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(id), nil
-}
-
 func main() {
+	rand.Seed(time.Now().UnixNano())
+
 	r := mux.NewRouter()
-	r.Path("/call").Methods("POST").HandlerFunc(call)
+	call := newCall()
+	r.Path("/call").Methods("POST").HandlerFunc(call.handle)
 	r.Path("/events").Methods("POST").HandlerFunc(events)
 
 	addr := fmt.Sprintf("0.0.0.0:%d", 8081)
