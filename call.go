@@ -4,14 +4,18 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"log"
+	"net"
 	"net/http"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/VoltFramework/volt/mesosproto"
 )
 
 type Calls map[string]func(call *mesosproto.Call, f *Framework) error
-type Accepts map[string]func(operation *mesosproto.Offer_Operation, f *Framework) error
+type Operations map[string]func(operation *mesosproto.Offer_Operation, f *Framework) error
 
 func generateEventUpdate(taskState mesosproto.TaskState, taskId *mesosproto.TaskID) *mesosproto.Event {
 	event_type := mesosproto.Event_UPDATE
@@ -41,6 +45,7 @@ func acceptLaunch(operation *mesosproto.Offer_Operation, f *Framework) error {
 				time.Sleep(1)
 
 				event = generateEventUpdate(mesosproto.TaskState_TASK_FINISHED, taskinfo.TaskId)
+
 				f.send(event)
 				f.AddTask(taskinfo.TaskId.GetValue())
 			}
@@ -69,9 +74,9 @@ func acceptDestroy(operation *mesosproto.Offer_Operation, f *Framework) error {
 func Accept(call *mesosproto.Call, f *Framework) error {
 
 	if call.Accept != nil && call.Accept.Operations != nil {
-		accepts := newAccepts()
+		operations := newOperations()
 		for _, operation := range call.Accept.Operations {
-			if err := (*accepts)[operation.Type.String()](operation, f); err != nil {
+			if err := (*operations)[operation.Type.String()](operation, f); err != nil {
 				return fmt.Errorf("malformed accept call")
 			}
 			return nil
@@ -105,22 +110,40 @@ func Unregister(call *mesosproto.Call, f *Framework) error {
 
 func Kill(call *mesosproto.Call, f *Framework) error {
 	if call.Kill != nil && call.Kill.GetTaskId() != nil {
+		var taskState mesosproto.TaskState
+		if f.GetTask(call.Kill.GetTaskId().GetValue()) {
+			taskState = mesosproto.TaskState_TASK_KILLED
+		} else {
+			taskState = mesosproto.TaskState_TASK_LOST
+		}
+		event := generateEventUpdate(taskState, call.Kill.GetTaskId())
+		f.send(event)
 		return nil
 	}
-	return nil
+	return fmt.Errorf("Bad format for Decline Call")
+
 }
 
 func Acknowledge(call *mesosproto.Call, f *Framework) error {
 	if call.Acknowledge != nil && call.Acknowledge.GetTaskId() != nil {
-		// remove task for status map
+		f.deleteTask(call.Acknowledge.GetTaskId().GetValue())
 		return nil
 	}
-	return nil
+	return fmt.Errorf("Unknown task %q", call.Acknowledge.GetTaskId())
 }
 
 func Reconcile(call *mesosproto.Call, f *Framework) error {
 	if call.Reconcile != nil && call.Reconcile.GetStatuses() != nil {
-		return nil
+		for _, task := range call.Reconcile.GetStatuses() {
+			var taskState mesosproto.TaskState
+			if f.GetTask(task.TaskId.GetValue()) {
+				taskState = mesosproto.TaskState_TASK_RUNNING
+			} else {
+				taskState = mesosproto.TaskState_TASK_LOST
+			}
+			event := generateEventUpdate(taskState, task.TaskId)
+			f.send(event)
+		}
 	}
 	return nil
 }
@@ -129,8 +152,16 @@ func Message(call *mesosproto.Call, f *Framework) error {
 	if call.Message != nil {
 		return nil
 	}
-	return nil
+	return fmt.Errorf("Missing message call to executor")
 }
+
+//TODO(ijimenez) As soon as this get added to the protobuf add this
+// func Shutdown(call *mesosproto.Call, f *Framework) error {
+// 	if call.Shutdown != nil {
+// 		return nil
+// 	}
+// 	return nil
+// }
 
 func (c *Calls) handle(res http.ResponseWriter, req *http.Request) {
 	call := mesosproto.Call{}
@@ -140,6 +171,24 @@ func (c *Calls) handle(res http.ResponseWriter, req *http.Request) {
 			return
 		}
 	} //else protobuf
+
+	res.Header().Set("Content-Type", "application/json")
+	name, err := os.Hostname()
+	if err != nil {
+		log.Fatalf("Failed to get hostname: %+v", err)
+	}
+
+	addrs, err := net.LookupHost(name)
+	if err != nil {
+		log.Fatalf("Failed to get address for hostname %q: %+v", name, err)
+	}
+	var localhost string
+	for _, addr := range addrs {
+		if !strings.HasPrefix(addr, "127") {
+			localhost = addr
+		}
+	}
+	res.Header().Set("Host", fmt.Sprintf("%s:%#v", localhost, *port))
 
 	ID := call.FrameworkInfo.Id.GetValue()
 	if f := frameworks.Get(ID); f != nil {
@@ -168,11 +217,12 @@ func newCall() *Calls {
 		"ACKNOWLEDGE": Acknowledge,
 		"RECONCILE":   Reconcile,
 		"MESSAGE":     Message,
+		//		"SHUTDOWN":    Shutdown, see TODO for shutdown
 	}
 }
 
-func newAccepts() *Accepts {
-	return &Accepts{
+func newOperations() *Operations {
+	return &Operations{
 		"LAUNCH":    acceptLaunch,
 		"CREATE":    acceptCreate,
 		"DESTROY":   acceptDestroy,

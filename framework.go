@@ -100,6 +100,13 @@ func (fw *Framework) AddTask(taskID string) {
 	fw.Unlock()
 }
 
+func (fw *Framework) GetTask(taskID string) bool {
+	fw.Lock()
+	defer fw.Unlock()
+	_, ok := fw.tasks[taskID]
+	return ok
+}
+
 func (fw *Framework) deleteTask(taskID string) error {
 	fw.Lock()
 	defer fw.Unlock()

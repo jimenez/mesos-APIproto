@@ -84,6 +84,9 @@ func events(res http.ResponseWriter, req *http.Request) {
 		ID    string
 		f     *Framework
 	)
+	res.Header().Set("Connection", "keep-alive")
+	res.Header().Set("Accept", "application/json")
+	res.Header().Set("Content-Type", "application/json")
 
 	if frameworkInfo.GetId() != nil {
 		ID = frameworkInfo.Id.GetValue()

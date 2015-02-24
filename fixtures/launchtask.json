@@ -1,1 +1,1 @@
-{"framework_info":{"id":{"value":"fda4867e4e9b"}}, "type":12, "accept":{"offer_ids":[], "operations": [{"type":1, "launch": {"task_infos": [{"name": "FOOBAR", "task_id": {"value": "BARFOO"}}]}}]}}
+{"framework_info":{"id":{"value":""}}, "type":12, "accept":{"offer_ids":[], "operations": [{"type":1, "launch": {"task_infos": [{"name": "FOOBAR", "task_id": {"value": "BARFOO"}}]}}]}}
