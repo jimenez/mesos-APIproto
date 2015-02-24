@@ -33,11 +33,43 @@ func createOffer(frameworkID *mesosproto.FrameworkID) *mesosproto.Offer {
 
 }
 
+func failoverTimer(ID string) {
+	for {
+		if f := frameworks.Get(ID); f != nil && *timeout != 0 {
+			select {
+			case <-f.connection:
+				fmt.Println("reregistering")
+				return
+			case <-time.After(time.Duration(*timeout) * time.Second * 100):
+				fmt.Println("deleting")
+				frameworks.deleteFramework(ID)
+			}
+		}
+		return
+	}
+}
+
+func sendExecutorUpdates(f *Framework, frameworkId *mesosproto.FrameworkID, remoteAddr string, notifier <-chan bool) {
+	for {
+		select {
+		case <-notifier:
+			return
+		case <-time.After(time.Duration(rand.Intn(10)) * time.Second):
+			for ID, _ := range f.GetTasks() {
+				taskID := &mesosproto.TaskID{Value: &ID}
+				event := generateEventUpdate(mesosproto.TaskState_TASK_RUNNING, taskID)
+				f.send(event)
+			}
+		}
+	}
+}
+
 func sendOffers(f *Framework, frameworkID *mesosproto.FrameworkID, remoteAddr string, notifier <-chan bool) {
 	for {
 		select {
 		case <-notifier:
 			f.deleteChan(remoteAddr)
+			go failoverTimer(frameworkID.GetValue())
 			fmt.Println("HTTP connection just closed.")
 			return
 		case <-time.After(time.Duration(rand.Intn(10)) * time.Second):
@@ -88,6 +120,10 @@ func events(res http.ResponseWriter, req *http.Request) {
 	res.Header().Set("Accept", "application/json")
 	res.Header().Set("Content-Type", "application/json")
 
+	if frameworkInfo.GetFailoverTimeout() != 0 {
+		*timeout = frameworkInfo.GetFailoverTimeout()
+	}
+
 	if frameworkInfo.GetId() != nil {
 		ID = frameworkInfo.Id.GetValue()
 		//Check that this framework hasn't registerd yet
@@ -98,6 +134,7 @@ func events(res http.ResponseWriter, req *http.Request) {
 		}
 		mchan = f.newChan(req.RemoteAddr)
 		// Reregistering framework
+		f.connection <- true
 		err := sendEvent(encoder, mesosproto.Event_REREGISTERED, &mesosproto.Event{
 			Reregistered: &mesosproto.Event_Reregistered{
 				FrameworkId: frameworkInfo.Id,
@@ -120,6 +157,7 @@ func events(res http.ResponseWriter, req *http.Request) {
 		frameworkInfo.Id = &mesosproto.FrameworkID{
 			Value: &ID,
 		}
+
 		err = sendEvent(encoder, mesosproto.Event_REGISTERED, &mesosproto.Event{
 			Registered: &mesosproto.Event_Registered{
 				FrameworkId: frameworkInfo.Id,

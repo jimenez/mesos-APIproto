@@ -41,24 +41,26 @@ func (fws *Frameworks) OffersSize() int {
 	return size
 }
 
-// func (fc *Frameworks) deleteFramework(ID string) {
-// 	fc.Lock()
-// 	delete(fc.queues, ID)
-// 	fc.Unlock()
-// }
+func (fws *Frameworks) deleteFramework(ID string) {
+	fws.Lock()
+	delete(fws.fws, ID)
+	fws.Unlock()
+}
 
 type Framework struct {
 	sync.RWMutex
-	chans  map[string]chan *mesosproto.Event
-	offers map[string]struct{}
-	tasks  map[string]struct{}
+	connection chan bool
+	chans      map[string]chan *mesosproto.Event
+	offers     map[string]struct{}
+	tasks      map[string]struct{}
 }
 
 func newFramework() *Framework {
 	return &Framework{
-		chans:  make(map[string]chan *mesosproto.Event),
-		offers: make(map[string]struct{}),
-		tasks:  make(map[string]struct{}),
+		connection: make(chan bool, 1),
+		chans:      make(map[string]chan *mesosproto.Event),
+		offers:     make(map[string]struct{}),
+		tasks:      make(map[string]struct{}),
 	}
 }
 
@@ -105,6 +107,12 @@ func (fw *Framework) GetTask(taskID string) bool {
 	defer fw.Unlock()
 	_, ok := fw.tasks[taskID]
 	return ok
+}
+
+func (fw *Framework) GetTasks() map[string]struct{} {
+	fw.Lock()
+	defer fw.Unlock()
+	return fw.tasks
 }
 
 func (fw *Framework) deleteTask(taskID string) error {

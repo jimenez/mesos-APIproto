@@ -12,10 +12,12 @@ import (
 )
 
 var (
-	port = flag.Int("p", 8081, "Port to listen on")
-	//TODO(jimenez) rate_limits flag
+	credentials = flag.String("c", "", "Credentials for framework authentication")
+	port        = flag.Int("p", 8081, "Port to listen on")
+	rateLimits  = flag.String("r", "", "Rate limits")
+
 	size       = flag.Int("s", 100, "Size of cluster abstracted as number of offers")
-	t          = flag.Int("t", 0, "Failover timeout")
+	timeout    = flag.Float64("t", 0, "Failover timeout")
 	frameworks = newFrameworks()
 )
 

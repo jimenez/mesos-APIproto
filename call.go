@@ -47,7 +47,9 @@ func acceptLaunch(operation *mesosproto.Offer_Operation, f *Framework) error {
 				event = generateEventUpdate(mesosproto.TaskState_TASK_FINISHED, taskinfo.TaskId)
 
 				f.send(event)
-				f.AddTask(taskinfo.TaskId.GetValue())
+				if taskinfo.GetExecutor() != nil {
+					f.AddTask(taskinfo.TaskId.GetValue())
+				}
 			}
 		}
 		return nil
@@ -55,10 +57,12 @@ func acceptLaunch(operation *mesosproto.Offer_Operation, f *Framework) error {
 	return fmt.Errorf("malformed launch operation")
 }
 
+// NOT YET IMPLEMENTED
 func acceptReserve(operation *mesosproto.Offer_Operation, f *Framework) error {
 	return nil
 }
 
+// NOT YET IMPLEMENTED
 func acceptUnReserve(operation *mesosproto.Offer_Operation, f *Framework) error {
 	return nil
 }
