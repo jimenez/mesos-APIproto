@@ -94,6 +94,24 @@ func (fw *Framework) deleteOffer(offerID string) error {
 	return nil
 }
 
+func (fw *Framework) AddTask(taskID string) {
+	fw.Lock()
+	fw.tasks[taskID] = struct{}{}
+	fw.Unlock()
+}
+
+func (fw *Framework) deleteTask(taskID string) error {
+	fw.Lock()
+	defer fw.Unlock()
+	if _, ok := fw.tasks[taskID]; !ok {
+		return fmt.Errorf("Unknown task %q", taskID)
+
+	}
+
+	delete(fw.tasks, taskID)
+	return nil
+}
+
 func (fw *Framework) send(event *mesosproto.Event) {
 	fw.RLock()
 	for _, ch := range fw.chans {

@@ -33,23 +33,29 @@ func createOffer(frameworkID *mesosproto.FrameworkID) *mesosproto.Offer {
 
 }
 
-func sendOffers(f *Framework, frameworkID *mesosproto.FrameworkID) {
+func sendOffers(f *Framework, frameworkID *mesosproto.FrameworkID, remoteAddr string, notifier <-chan bool) {
 	for {
+		select {
+		case <-notifier:
+			f.deleteChan(remoteAddr)
+			fmt.Println("HTTP connection just closed.")
+			return
+		case <-time.After(time.Duration(rand.Intn(10)) * time.Second):
 
-		time.Sleep(time.Duration(rand.Intn(10)) * time.Second)
-		if frameworks.OffersSize() >= *size {
-			continue
+			if frameworks.OffersSize() >= *size {
+				continue
+			}
+			offer := createOffer(frameworkID)
+			event_type := mesosproto.Event_OFFERS
+			event := &mesosproto.Event{
+				Type: &event_type,
+				Offers: &mesosproto.Event_Offers{
+					Offers: []*mesosproto.Offer{offer},
+				},
+			}
+			f.send(event)
+			f.AddOffer(offer.Id.GetValue())
 		}
-		offer := createOffer(frameworkID)
-		event_type := mesosproto.Event_OFFERS
-		event := &mesosproto.Event{
-			Type: &event_type,
-			Offers: &mesosproto.Event_Offers{
-				Offers: []*mesosproto.Offer{offer},
-			},
-		}
-		f.send(event)
-		f.AddOffer(offer.Id.GetValue())
 	}
 }
 
@@ -121,12 +127,9 @@ func events(res http.ResponseWriter, req *http.Request) {
 			return
 		}
 	}
-	go sendOffers(f, frameworkInfo.Id)
+
 	notify := res.(http.CloseNotifier).CloseNotify()
-	go func() {
-		<-notify
-		fmt.Println("HTTP connection just closed.")
-	}()
+	go sendOffers(f, frameworkInfo.Id, req.RemoteAddr, notify)
 
 	for {
 		mess := <-mchan

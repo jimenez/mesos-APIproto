@@ -12,7 +12,8 @@ import (
 )
 
 var (
-	port       = flag.Int("p", 8081, "Port to listen on")
+	port = flag.Int("p", 8081, "Port to listen on")
+	//TODO(jimenez) rate_limits flag
 	size       = flag.Int("s", 100, "Size of cluster abstracted as number of offers")
 	frameworks = newFrameworks()
 )
