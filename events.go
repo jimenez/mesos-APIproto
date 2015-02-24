@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"math/rand"
 	"net/http"
@@ -14,32 +15,41 @@ import (
 
 func sendEvent(encoder *json.Encoder, eventType mesosproto.Event_Type, event *mesosproto.Event) error {
 	event.Type = &eventType
-	log.Infof(" ======= SENDING EVENT ======= Type: %s", event.Type.String())
+	log.WithFields(log.Fields{"Type": event.Type.String()}).Info("Sending event")
 	return encoder.Encode(event)
 }
 
-func sendOffers(encoder *json.Encoder, frameworkInfo *mesosproto.FrameworkInfo) {
-	for {
-		time.Sleep(time.Duration(rand.Intn(10)) * time.Second)
-		slaveId, _ := generateID()
-		offerId, _ := generateID()
-		hostname := "slave.host" + slaveId
-		offer := mesosproto.Offer{
-			Id:          &mesosproto.OfferID{Value: &offerId},
-			FrameworkId: frameworkInfo.Id,
-			SlaveId:     &mesosproto.SlaveID{Value: &slaveId},
-			Hostname:    &hostname,
-			Resources:   resources(),
-		}
-		event_type := mesosproto.Event_OFFERS
+func createOffer(frameworkID *mesosproto.FrameworkID) *mesosproto.Offer {
+	slaveId, _ := generateID()
+	offerId, _ := generateID()
+	hostname := "slave.host" + slaveId
+	return &mesosproto.Offer{
+		Id:          &mesosproto.OfferID{Value: &offerId},
+		FrameworkId: frameworkID,
+		SlaveId:     &mesosproto.SlaveID{Value: &slaveId},
+		Hostname:    &hostname,
+		Resources:   resources(),
+	}
 
+}
+
+func sendOffers(f *Framework, frameworkID *mesosproto.FrameworkID) {
+	for {
+
+		time.Sleep(time.Duration(rand.Intn(10)) * time.Second)
+		if frameworks.OffersSize() >= *size {
+			continue
+		}
+		offer := createOffer(frameworkID)
+		event_type := mesosproto.Event_OFFERS
 		event := &mesosproto.Event{
 			Type: &event_type,
 			Offers: &mesosproto.Event_Offers{
-				Offers: []*mesosproto.Offer{&offer},
+				Offers: []*mesosproto.Offer{offer},
 			},
 		}
-		frameworksChans.send(frameworkInfo.Id.GetValue(), event)
+		f.send(event)
+		f.AddOffer(offer.Id.GetValue())
 	}
 }
 
@@ -66,16 +76,18 @@ func events(res http.ResponseWriter, req *http.Request) {
 	var (
 		mchan chan *mesosproto.Event
 		ID    string
+		f     *Framework
 	)
 
 	if frameworkInfo.GetId() != nil {
 		ID = frameworkInfo.Id.GetValue()
 		//Check that this framework hasn't registerd yet
-		if !frameworksChans.hasID(ID) {
+		f = frameworks.Get(ID)
+		if f == nil {
 			http.Error(res, "Unknown framework", 403)
 			return
 		}
-		mchan = frameworksChans.create(ID, req.RemoteAddr)
+		mchan = f.newChan(req.RemoteAddr)
 		// Reregistering framework
 		err := sendEvent(encoder, mesosproto.Event_REREGISTERED, &mesosproto.Event{
 			Reregistered: &mesosproto.Event_Reregistered{
@@ -94,7 +106,8 @@ func events(res http.ResponseWriter, req *http.Request) {
 			http.Error(res, err.Error(), 500)
 			return
 		}
-		mchan = frameworksChans.create(ID, req.RemoteAddr)
+		f = frameworks.New(ID)
+		mchan = f.newChan(req.RemoteAddr)
 		frameworkInfo.Id = &mesosproto.FrameworkID{
 			Value: &ID,
 		}
@@ -108,11 +121,17 @@ func events(res http.ResponseWriter, req *http.Request) {
 			return
 		}
 	}
-	go sendOffers(encoder, &frameworkInfo)
+	go sendOffers(f, frameworkInfo.Id)
+	notify := res.(http.CloseNotifier).CloseNotify()
+	go func() {
+		<-notify
+		fmt.Println("HTTP connection just closed.")
+	}()
+
 	for {
 		mess := <-mchan
 		if err := sendEvent(encoder, *mess.Type, mess); err != nil {
-			frameworksChans.delete(ID, req.RemoteAddr)
+			f.deleteChan(req.RemoteAddr)
 		}
 	}
 }
