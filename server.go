@@ -3,11 +3,13 @@ package main
 import (
 	"flag"
 	"fmt"
-	"log"
+
 	"math/rand"
 	"net/http"
 	"time"
 
+	log "github.com/Sirupsen/logrus"
+	"github.com/VoltFramework/volt/mesosproto"
 	"github.com/gorilla/mux"
 )
 
@@ -17,7 +19,7 @@ var (
 	rateLimits  = flag.String("r", "", "Rate limits")
 
 	size       = flag.Int("s", 100, "Size of cluster abstracted as number of offers")
-	timeout    = flag.Float64("t", 0, "Failover timeout")
+	timeout    = flag.Float64("t", mesosproto.Default_FrameworkInfo_FailoverTimeout, "Failover timeout")
 	frameworks = newFrameworks()
 )
 
@@ -32,6 +34,6 @@ func main() {
 
 	addr := fmt.Sprintf("0.0.0.0:%d", *port)
 
-	log.Printf("Example app listening at http://%s\n", addr)
+	log.Infof("Example scheduler listening at http://%s", addr)
 	log.Fatal(http.ListenAndServe(addr, r))
 }

@@ -2,8 +2,11 @@ package main
 
 import (
 	"fmt"
+	"net/http"
 	"sync"
+	"time"
 
+	log "github.com/Sirupsen/logrus"
 	"github.com/VoltFramework/volt/mesosproto"
 )
 
@@ -27,7 +30,7 @@ func (fws *Frameworks) Get(ID string) *Framework {
 func (fws *Frameworks) New(ID string) *Framework {
 	fws.Lock()
 	defer fws.Unlock()
-	fws.fws[ID] = newFramework()
+	fws.fws[ID] = newFramework(ID)
 	return fws.fws[ID]
 }
 
@@ -49,32 +52,62 @@ func (fws *Frameworks) deleteFramework(ID string) {
 
 type Framework struct {
 	sync.RWMutex
+	notify     <-chan bool
 	connection chan bool
-	chans      map[string]chan *mesosproto.Event
+	ID         string
+	ch         chan *mesosproto.Event
 	offers     map[string]struct{}
 	tasks      map[string]struct{}
 }
 
-func newFramework() *Framework {
+func newFramework(ID string) *Framework {
 	return &Framework{
-		connection: make(chan bool, 1),
-		chans:      make(map[string]chan *mesosproto.Event),
-		offers:     make(map[string]struct{}),
-		tasks:      make(map[string]struct{}),
+		offers: make(map[string]struct{}),
+		tasks:  make(map[string]struct{}),
+		ID:     ID,
 	}
 }
 
-func (fw *Framework) newChan(remoteAddr string) chan *mesosproto.Event {
+func (fw *Framework) listenOnNotify(timeout float64) {
+	<-fw.notify
+	fw.deleteChan()
+	log.Infof("Connection closed for framework %q", fw.ID)
+
+	select {
+	case <-fw.connection:
+
+		log.Infof("Reregistering framework %q", fw.ID)
+		return
+	case <-time.After(time.Duration(timeout) * time.Second):
+
+		log.Warnf("Deleting framework %q", fw.ID)
+		frameworks.deleteFramework(fw.ID)
+	}
+}
+
+func (fw *Framework) hasChan() bool {
+	return fw.ch != nil
+}
+
+func (fw *Framework) newChan(res http.ResponseWriter, timeout float64) chan *mesosproto.Event {
 	fw.Lock()
 	defer fw.Unlock()
 
-	fw.chans[remoteAddr] = make(chan *mesosproto.Event)
-	return fw.chans[remoteAddr]
+	if fw.connection != nil {
+		close(fw.connection)
+	}
+	fw.ch = make(chan *mesosproto.Event)
+	fw.connection = make(chan bool)
+	fw.notify = res.(http.CloseNotifier).CloseNotify()
+	go fw.listenOnNotify(timeout)
+	return fw.ch
 }
 
-func (fw *Framework) deleteChan(remoteAddr string) {
+func (fw *Framework) deleteChan() {
 	fw.Lock()
-	delete(fw.chans, remoteAddr)
+	close(fw.ch)
+
+	fw.ch = nil
 	fw.Unlock()
 }
 
@@ -128,9 +161,5 @@ func (fw *Framework) deleteTask(taskID string) error {
 }
 
 func (fw *Framework) send(event *mesosproto.Event) {
-	fw.RLock()
-	for _, ch := range fw.chans {
-		ch <- event
-	}
-	fw.RUnlock()
+	fw.ch <- event
 }

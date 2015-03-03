@@ -4,13 +4,14 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"log"
+
 	"net"
 	"net/http"
 	"os"
 	"strings"
 	"time"
 
+	log "github.com/Sirupsen/logrus"
 	"github.com/VoltFramework/volt/mesosproto"
 )
 
@@ -47,9 +48,7 @@ func acceptLaunch(operation *mesosproto.Offer_Operation, f *Framework) error {
 				event = generateEventUpdate(mesosproto.TaskState_TASK_FINISHED, taskinfo.TaskId)
 
 				f.send(event)
-				if taskinfo.GetExecutor() != nil {
-					f.AddTask(taskinfo.TaskId.GetValue())
-				}
+				f.AddTask(taskinfo.TaskId.GetValue())
 			}
 		}
 		return nil
@@ -130,8 +129,7 @@ func Kill(call *mesosproto.Call, f *Framework) error {
 
 func Acknowledge(call *mesosproto.Call, f *Framework) error {
 	if call.Acknowledge != nil && call.Acknowledge.GetTaskId() != nil {
-		f.deleteTask(call.Acknowledge.GetTaskId().GetValue())
-		return nil
+		return f.deleteTask(call.Acknowledge.GetTaskId().GetValue())
 	}
 	return fmt.Errorf("Unknown task %q", call.Acknowledge.GetTaskId())
 }
@@ -203,6 +201,7 @@ func (c *Calls) handle(res http.ResponseWriter, req *http.Request) {
 		}
 		if err := (*c)[call.Type.String()](&call, f); err != nil {
 			//check type
+			log.Error(err)
 			http.Error(res, err.Error(), 500)
 			return
 		}
