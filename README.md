@@ -30,6 +30,16 @@ Usage of ./mesos-APIproto:
 ```sh
 $ ./mesos-APIproto -p <port> -t <failover_timeout> -s <cluster_size>
 ```
+Once the API is served you can try to register with:
+
+```sh
+$ curl -i -X POST localhost:8081/call -H "Content-Type:application/json" --data-binary "@/path/to/go/src/github.com/jimenez/mesos-APIproto/fixtures/register.json"
+```
+and add your recently acquired frameworkId to `fixtures/launchtask.json` then launch a task with:
+
+```sh
+$ curl -i -X POST localhost:8081/call -H "Content-Type:application/json" --data-binary "@/path/to/go/src/github.com/jimenez/mesos-APIproto/fixtures/launchtask.json"
+```
 
 The prototype can be set to send a limited size of offers, so as to simulate the size of a cluster.
 
@@ -37,7 +47,7 @@ The prototype can be set to send a limited size of offers, so as to simulate the
 
 This prototype is ought to be used to test the consistency of the new HTTP API architecture. 
 Master behaviour is off topic.
-Although the prototype is meant to mimic the Mesos master new HTTP API behaviour, there are some functionalities that have fixed outcomes. 
+Although the prototype is meant to mimic the Mesos master<->scheduler new HTTP API behaviour, there are some functionalities that have fixed outcomes. 
 Since tasks are not launched in reality, their state is simulated and for practical purposes it will not fail.
 Executor behaviour reproduction is completely pretended, messages have to be considered 
 succesfully delievered on both ways.

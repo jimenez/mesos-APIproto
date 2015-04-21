@@ -1,9 +1,7 @@
 package main
 
 import (
-	"encoding/json"
 	"io"
-	"io/ioutil"
 	"math/rand"
 	"net/http"
 	"time"
@@ -15,7 +13,11 @@ import (
 
 func sendEvent(encoder icoder, eventType mesosproto.Event_Type, event *mesosproto.Event) error {
 	event.Type = &eventType
-	log.WithFields(log.Fields{"Type": event.Type.String()}).Info("Sending event")
+	if event.Type.String() == "UPDATE" {
+		log.WithFields(log.Fields{"Type": event.Type.String(), "TaskState": event.Update.GetStatus().GetState().String()}).Info("Sending event")
+	} else {
+		log.WithFields(log.Fields{"Type": event.Type.String()}).Info("Sending event")
+	}
 	return encoder.Encode(event)
 }
 
@@ -89,27 +91,7 @@ func (pe *protobufEncoder) Encode(v interface{}) error {
 	return err
 }
 
-func events(res http.ResponseWriter, req *http.Request) {
-	var encoder icoder
-	frameworkInfo := mesosproto.FrameworkInfo{}
-	if req.Header.Get("Content-Type") == "application/json" {
-		if err := json.NewDecoder(req.Body).Decode(&frameworkInfo); err != nil {
-			http.Error(res, err.Error(), 501)
-			return
-		}
-		encoder = json.NewEncoder(NewWriteFlusher(res))
-	} else {
-		buf, err := ioutil.ReadAll(req.Body)
-		if err != nil {
-			http.Error(res, err.Error(), 502)
-			return
-		}
-		if err := proto.Unmarshal(buf, &frameworkInfo); err != nil {
-			http.Error(res, err.Error(), 503)
-			return
-		}
-		encoder = &protobufEncoder{w: res}
-	}
+func events(frameworkInfo *mesosproto.FrameworkInfo, encoder icoder, res http.ResponseWriter) {
 
 	var (
 		mchan    chan *mesosproto.Event

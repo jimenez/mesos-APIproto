@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 
 	"net"
@@ -157,7 +156,7 @@ func Message(call *mesosproto.Call, f *Framework) error {
 	return fmt.Errorf("Missing message call to executor")
 }
 
-//TODO(ijimenez) As soon as this get added to the protobuf add this
+//TODO(ijimenez): As soon as this get added to the protobuf add this
 // func Shutdown(call *mesosproto.Call, f *Framework) error {
 // 	if call.Shutdown != nil {
 // 		return nil
@@ -166,13 +165,15 @@ func Message(call *mesosproto.Call, f *Framework) error {
 // }
 
 func (c *Calls) handle(res http.ResponseWriter, req *http.Request) {
-	call := mesosproto.Call{}
-	if req.Header.Get("Content-Type") == "application/json" {
-		if err := json.NewDecoder(req.Body).Decode(&call); err != nil {
-			http.Error(res, err.Error(), 500)
-			return
-		}
-	} //else protobuf
+	frameworkInfo, call, encoder, err := decodeCallorFrameworkInfo(res, req)
+	if err != nil {
+		http.Error(res, err.Error(), 400)
+		return
+	}
+	if frameworkInfo != nil {
+		events(frameworkInfo, encoder, res)
+		return
+	}
 
 	res.Header().Set("Content-Type", "application/json")
 	name, err := os.Hostname()
@@ -194,12 +195,12 @@ func (c *Calls) handle(res http.ResponseWriter, req *http.Request) {
 
 	ID := call.FrameworkInfo.Id.GetValue()
 	if f := frameworks.Get(ID); f != nil {
-		if _, ok := (*c)[call.Type.String()]; !ok {
+		if _, ok := (*c)[(*call).Type.String()]; !ok {
 			// unsuported call
 			res.WriteHeader(500)
 			return
 		}
-		if err := (*c)[call.Type.String()](&call, f); err != nil {
+		if err := (*c)[(*call).Type.String()](call, f); err != nil {
 			//check type
 			log.Error(err)
 			http.Error(res, err.Error(), 500)

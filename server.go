@@ -30,7 +30,6 @@ func main() {
 	r := mux.NewRouter()
 	call := newCall()
 	r.Path("/call").Methods("POST").HandlerFunc(call.handle)
-	r.Path("/events").Methods("POST").HandlerFunc(events)
 
 	addr := fmt.Sprintf("0.0.0.0:%d", *port)
 
