@@ -165,13 +165,13 @@ func Message(call *mesosproto.Call, f *Framework) error {
 // }
 
 func (c *Calls) handle(res http.ResponseWriter, req *http.Request) {
-	frameworkInfo, call, encoder, err := decodeCallorFrameworkInfo(res, req)
+	call, encoder, err := decodeCall(res, req)
 	if err != nil {
 		http.Error(res, err.Error(), 400)
 		return
 	}
-	if frameworkInfo != nil {
-		events(frameworkInfo, encoder, res)
+	if call.GetFrameworkInfo().GetId() != nil {
+		events(call.GetFrameworkInfo(), encoder, res)
 		return
 	}
 
