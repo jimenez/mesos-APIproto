@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
 
 	"net"
@@ -11,7 +10,7 @@ import (
 	"time"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/VoltFramework/volt/mesosproto"
+	"github.com/jimenez/mesos-APIproto/mesosproto"
 )
 
 type Calls map[string]func(call *mesosproto.Call, f *Framework) error
@@ -19,11 +18,9 @@ type Operations map[string]func(operation *mesosproto.Offer_Operation, f *Framew
 
 func generateEventUpdate(taskState mesosproto.TaskState, taskId *mesosproto.TaskID) *mesosproto.Event {
 	event_type := mesosproto.Event_UPDATE
-	uuid, _ := generateID()
 	return &mesosproto.Event{
 		Type: &event_type,
 		Update: &mesosproto.Event_Update{
-			Uuid: bytes.NewBufferString(uuid).Bytes(),
 			Status: &mesosproto.TaskStatus{
 				TaskId: taskId,
 				State:  &taskState,
@@ -74,7 +71,6 @@ func acceptDestroy(operation *mesosproto.Offer_Operation, f *Framework) error {
 }
 
 func Accept(call *mesosproto.Call, f *Framework) error {
-
 	if call.Accept != nil && call.Accept.Operations != nil {
 		operations := newOperations()
 		for _, operation := range call.Accept.Operations {
@@ -134,8 +130,8 @@ func Acknowledge(call *mesosproto.Call, f *Framework) error {
 }
 
 func Reconcile(call *mesosproto.Call, f *Framework) error {
-	if call.Reconcile != nil && call.Reconcile.GetStatuses() != nil {
-		for _, task := range call.Reconcile.GetStatuses() {
+	if call.Reconcile != nil && call.Reconcile.GetTasks() != nil {
+		for _, task := range call.Reconcile.GetTasks() {
 			var taskState mesosproto.TaskState
 			if f.GetTask(task.TaskId.GetValue()) {
 				taskState = mesosproto.TaskState_TASK_RUNNING
@@ -170,7 +166,7 @@ func (c *Calls) handle(res http.ResponseWriter, req *http.Request) {
 		http.Error(res, err.Error(), 400)
 		return
 	}
-	if call.GetFrameworkInfo().GetId() != nil {
+	if call.GetFrameworkInfo().GetId() == nil {
 		events(call.GetFrameworkInfo(), encoder, res)
 		return
 	}
@@ -197,7 +193,7 @@ func (c *Calls) handle(res http.ResponseWriter, req *http.Request) {
 	if f := frameworks.Get(ID); f != nil {
 		if _, ok := (*c)[(*call).Type.String()]; !ok {
 			// unsuported call
-			res.WriteHeader(500)
+			res.WriteHeader(404)
 			return
 		}
 		if err := (*c)[(*call).Type.String()](call, f); err != nil {
@@ -209,7 +205,7 @@ func (c *Calls) handle(res http.ResponseWriter, req *http.Request) {
 		res.WriteHeader(http.StatusAccepted)
 		return
 	}
-	http.Error(res, fmt.Sprintf("Unknown framework %q", ID), 404)
+	http.Error(res, fmt.Sprintf("Unknown framework %q", ID), 403)
 }
 
 func newCall() *Calls {

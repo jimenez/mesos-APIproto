@@ -9,8 +9,8 @@ import (
 	"time"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/VoltFramework/volt/mesosproto"
 	"github.com/gorilla/mux"
+	"github.com/jimenez/mesos-APIproto/mesosproto"
 )
 
 var (

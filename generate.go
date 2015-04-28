@@ -5,7 +5,7 @@ import (
 	"encoding/hex"
 	"math/rand"
 
-	"github.com/VoltFramework/volt/mesosproto"
+	"github.com/jimenez/mesos-APIproto/mesosproto"
 )
 
 func generateID() (string, error) {
@@ -18,7 +18,6 @@ func generateID() (string, error) {
 }
 
 func createRangeResource(name string, begin uint64) *mesosproto.Resource {
-	rType := mesosproto.Resource_STATIC
 	disk := mesosproto.Resource_DiskInfo{}
 	end := begin + 10000
 	return &mesosproto.Resource{
@@ -32,20 +31,17 @@ func createRangeResource(name string, begin uint64) *mesosproto.Resource {
 				},
 			},
 		},
-		ReservationType: &rType,
-		Disk:            &disk,
+		Disk: &disk,
 	}
 }
 
 func createScalarResource(name string, value float64) *mesosproto.Resource {
-	rType := mesosproto.Resource_DYNAMIC
 	disk := mesosproto.Resource_DiskInfo{}
 	return &mesosproto.Resource{
-		Name:            &name,
-		Type:            mesosproto.Value_SCALAR.Enum(),
-		Scalar:          &mesosproto.Value_Scalar{Value: &value},
-		ReservationType: &rType,
-		Disk:            &disk,
+		Name:   &name,
+		Type:   mesosproto.Value_SCALAR.Enum(),
+		Scalar: &mesosproto.Value_Scalar{Value: &value},
+		Disk:   &disk,
 	}
 }
 

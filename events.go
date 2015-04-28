@@ -8,7 +8,7 @@ import (
 
 	"code.google.com/p/goprotobuf/proto"
 	log "github.com/Sirupsen/logrus"
-	"github.com/VoltFramework/volt/mesosproto"
+	"github.com/jimenez/mesos-APIproto/mesosproto"
 )
 
 func sendEvent(encoder icoder, eventType mesosproto.Event_Type, event *mesosproto.Event) error {
@@ -109,7 +109,7 @@ func events(frameworkInfo *mesosproto.FrameworkInfo, encoder icoder, res http.Re
 
 	if frameworkInfo.GetId() != nil {
 		ID = frameworkInfo.Id.GetValue()
-		//Check that this framework hasn't registerd yet
+		//Check that this framework hasn't subsribed yet
 		f = frameworks.Get(ID)
 		if f == nil {
 			http.Error(res, "Unknown framework", 403)
@@ -117,15 +117,15 @@ func events(frameworkInfo *mesosproto.FrameworkInfo, encoder icoder, res http.Re
 		}
 
 		if f.hasChan() {
-			http.Error(res, "Framework already registered", 403)
+			http.Error(res, "Framework already subscribed", 403)
 			return
 		}
 
-		// Reregistering framework
+		// Resubscribing framework
 		mchan = f.newChan(res, failover)
-
-		err := sendEvent(encoder, mesosproto.Event_REREGISTERED, &mesosproto.Event{
-			Reregistered: &mesosproto.Event_Reregistered{
+		// Sending subcribed for resubscribtion
+		err := sendEvent(encoder, mesosproto.Event_SUBSCRIBED, &mesosproto.Event{
+			Subscribed: &mesosproto.Event_Subscribed{
 				FrameworkId: frameworkInfo.Id,
 			},
 		})
@@ -135,7 +135,7 @@ func events(frameworkInfo *mesosproto.FrameworkInfo, encoder icoder, res http.Re
 		}
 
 	} else {
-		//Create and register framework to chan
+		//Create and subscribe framework to chan
 		ID, err := generateID()
 		if err != nil {
 			http.Error(res, err.Error(), 500)
@@ -147,8 +147,8 @@ func events(frameworkInfo *mesosproto.FrameworkInfo, encoder icoder, res http.Re
 			Value: &ID,
 		}
 
-		err = sendEvent(encoder, mesosproto.Event_REGISTERED, &mesosproto.Event{
-			Registered: &mesosproto.Event_Registered{
+		err = sendEvent(encoder, mesosproto.Event_SUBSCRIBED, &mesosproto.Event{
+			Subscribed: &mesosproto.Event_Subscribed{
 				FrameworkId: frameworkInfo.Id,
 			},
 		})

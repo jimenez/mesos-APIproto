@@ -30,16 +30,18 @@ Usage of ./mesos-APIproto:
 ```sh
 $ ./mesos-APIproto -p <port> -t <failover_timeout> -s <cluster_size>
 ```
-Once the API is served you can try to register with:
+Once the API is served you can try to subscribe with:
 
 ```sh
-$ curl -i -X POST localhost:8081/call -H "Content-Type:application/json" --data-binary "@/path/to/go/src/github.com/jimenez/mesos-APIproto/fixtures/register.json"
+$ curl -i -X POST localhost:8081/call -H "Content-Type:application/json" --data-binary "@/path/to/go/src/github.com/jimenez/mesos-APIproto/fixtures/subscribe.json"
 ```
 and add your recently acquired frameworkId to `fixtures/launchtask.json` then launch a task with:
 
 ```sh
 $ curl -i -X POST localhost:8081/call -H "Content-Type:application/json" --data-binary "@/path/to/go/src/github.com/jimenez/mesos-APIproto/fixtures/launchtask.json"
 ```
+You can try all the different types of calls, the events sent on the stream you subscribe to will reflect some of the results of your succesful calls.
+
 
 The prototype can be set to send a limited size of offers, so as to simulate the size of a cluster.
 

@@ -5,11 +5,12 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	"github.com/VoltFramework/volt/mesosproto"
 	"github.com/gogo/protobuf/proto"
+	"github.com/jimenez/mesos-APIproto/mesosproto"
 )
 
 func decodeCall(res http.ResponseWriter, req *http.Request) (*mesosproto.Call, icoder, error) {
+
 	buf, err := ioutil.ReadAll(req.Body)
 	if err != nil {
 		return nil, nil, err

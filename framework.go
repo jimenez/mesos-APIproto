@@ -7,7 +7,7 @@ import (
 	"time"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/VoltFramework/volt/mesosproto"
+	"github.com/jimenez/mesos-APIproto/mesosproto"
 )
 
 type Frameworks struct {
