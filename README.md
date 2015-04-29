@@ -45,7 +45,7 @@ You can try all the different types of calls, the events sent on the stream you 
 
 The prototype can be set to send a limited size of offers, so as to simulate the size of a cluster.
 
-### Fonctionalities
+### Functionalities
 
 This prototype is ought to be used to test the consistency of the new HTTP API architecture. 
 Master behaviour is off topic.
