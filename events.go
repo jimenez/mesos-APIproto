@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	"code.google.com/p/goprotobuf/proto"
+	"github.com/golang/protobuf/proto"
 	log "github.com/Sirupsen/logrus"
 	"github.com/jimenez/mesos-APIproto/mesosproto"
 )
